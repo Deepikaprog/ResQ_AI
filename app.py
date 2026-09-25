@@ -1,8 +1,9 @@
 import streamlit as st
 
+from agents.medical import get_ai_medical_assessments
+from agents.logistics import get_ai_logistics_assessments
 from agents.coordinator import create_final_plan
-from agents.communication import generate_messages, generate_explanation
-from data.disaster_data import resources
+from agents.communication import generate_messages
 
 
 st.set_page_config(
@@ -11,59 +12,103 @@ st.set_page_config(
     layout="wide"
 )
 
+
 st.title("🚨 ResQ-AI")
 st.subheader("Multi-Agent Disaster Response Coordinator")
 
 st.write(
-    "AI-assisted coordination of limited disaster-response "
-    "resources across multiple affected zones."
+    "AI-powered coordination of disaster-response resources "
+    "using specialized local AI agents."
 )
 
 st.success("🟢 System Status: ACTIVE")
-st.info("📡 Connectivity: OFFLINE MODE (Simulated Reports)")
-
-final_plan = create_final_plan()
+st.info("🤖 AI Engine: Llama 3.2 via Ollama | Local Mode")
 
 
-# Agent Status
+# --------------------------------------------------
+# RUN AI PIPELINE
+# --------------------------------------------------
 
-st.header("🤖 Agent Status")
+with st.spinner("🤖 AI agents are analyzing the disaster situation..."):
+
+    medical_results = get_ai_medical_assessments()
+
+    logistics_results = get_ai_logistics_assessments()
+
+    final_plan = create_final_plan()
+
+    messages = generate_messages()
+
+
+# --------------------------------------------------
+# AGENT STATUS
+# --------------------------------------------------
+
+st.header("🤖 AI Agent Status")
 
 col1, col2, col3, col4 = st.columns(4)
 
-col1.success("🏥 Medical Agent")
-col2.success("🚚 Logistics Agent")
-col3.success("🤖 Coordinator")
-col4.success("📢 Communication")
+col1.success("🏥 Medical Agent\n\nACTIVE")
+col2.success("🚚 Logistics Agent\n\nACTIVE")
+col3.success("🤖 Coordinator Agent\n\nACTIVE")
+col4.success("📢 Communication Agent\n\nACTIVE")
 
 
-# Available Resources
+# --------------------------------------------------
+# MEDICAL AGENT
+# --------------------------------------------------
 
-st.header("📦 Available Resources")
+st.header("🏥 Medical AI Agent")
 
-col1, col2, col3, col4 = st.columns(4)
+st.write(
+    "Analyzes medical urgency and identifies the response focus "
+    "for each disaster zone."
+)
 
-col1.metric("🚑 Ambulances", resources["ambulances"])
-col2.metric("🚚 Rescue Vehicles", resources["rescue_vehicles"])
-col3.metric("🩹 Medical Kits", resources["medical_kits"])
-col4.metric("🏠 Shelter Capacity", resources["shelter_capacity"])
+for item in medical_results:
+
+    with st.expander(f"🏥 {item['zone']} — Medical Assessment"):
+
+        st.write(item["assessment"])
 
 
-# Zone Response Plan
+# --------------------------------------------------
+# LOGISTICS AGENT
+# --------------------------------------------------
 
-st.header("🗺️ Zone Response Plan")
+st.header("🚚 Logistics AI Agent")
+
+st.write(
+    "Analyzes transportation and logistical priorities using "
+    "the disaster information and Medical Agent assessment."
+)
+
+for item in logistics_results:
+
+    with st.expander(f"🚚 {item['zone']} — Logistics Assessment"):
+
+        st.write(item["logistics_assessment"])
+
+
+# --------------------------------------------------
+# FINAL RESOURCE PLAN
+# --------------------------------------------------
+
+st.header("📦 Final Resource Allocation")
 
 for item in final_plan:
 
-    if item["priority"] > 600:
+    if item["priority"] >= 600:
         level = "🔴 CRITICAL"
-    elif item["priority"] > 300:
+
+    elif item["priority"] >= 300:
         level = "🟠 HIGH"
+
     else:
         level = "🟡 MEDIUM"
 
     with st.expander(
-        f"{level} | {item['zone']} | Score {item['priority']}"
+        f"{level} | {item['zone']} | Priority Score: {item['priority']}"
     ):
 
         col1, col2, col3, col4 = st.columns(4)
@@ -100,43 +145,96 @@ for item in final_plan:
             f"**Road status:** {item['road_status']}"
         )
 
-        st.write("### 🧠 Why this allocation?")
 
-        reasons = generate_explanation(item)
+# --------------------------------------------------
+# COORDINATOR DECISION
+# --------------------------------------------------
 
-        for reason in reasons:
-            st.write(f"• {reason}")
+st.header("🤖 Coordinator Decision")
 
+if final_plan:
 
-# Communication Messages
+    coordinator_decision = final_plan[0]["coordinator_decision"]
 
-st.header("📢 Response Messages")
-
-messages = generate_messages()
-
-for message in messages:
-    st.info(message)
+    st.info(coordinator_decision)
 
 
-# Response Control
+# --------------------------------------------------
+# COMMUNICATION AGENT
+# --------------------------------------------------
+
+st.header("📢 AI-Generated Response Messages")
+
+for item in messages:
+
+    st.info(
+        f"**{item['zone']}**\n\n"
+        f"{item['message']}"
+    )
+
+
+# --------------------------------------------------
+# RESOURCE SUMMARY
+# --------------------------------------------------
+
+st.header("📊 Resource Utilization")
+
+total_ambulances = sum(
+    item["ambulances"]
+    for item in final_plan
+)
+
+total_rescue = sum(
+    item["rescue_vehicles"]
+    for item in final_plan
+)
+
+total_kits = sum(
+    item["medical_kits"]
+    for item in final_plan
+)
+
+total_shelter = sum(
+    item["shelter_slots"]
+    for item in final_plan
+)
+
+col1, col2, col3, col4 = st.columns(4)
+
+col1.metric(
+    "🚑 Ambulances Used",
+    total_ambulances
+)
+
+col2.metric(
+    "🚚 Rescue Vehicles Used",
+    total_rescue
+)
+
+col3.metric(
+    "🩹 Medical Kits Used",
+    total_kits
+)
+
+col4.metric(
+    "🏠 Shelter Slots Used",
+    total_shelter
+)
+
+
+# --------------------------------------------------
+# RE-PLAN
+# --------------------------------------------------
 
 st.header("🔄 Response Control")
 
 if st.button("🔄 Re-plan Resources"):
 
+    st.cache_data.clear()
+
     st.success(
-        "Resources have been recalculated using the latest "
-        "disaster information."
+        "🚨 Disaster information re-evaluated. "
+        "AI agents are generating a new response plan."
     )
 
     st.rerun()
-
-
-# New Disaster Zone Simulation
-
-if st.button("➕ Simulate New Disaster Zone"):
-
-    st.warning(
-        "🚨 New disaster zone detected! "
-        "Resource re-planning is required."
-    )
